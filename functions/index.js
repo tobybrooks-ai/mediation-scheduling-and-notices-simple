@@ -319,14 +319,26 @@ exports.submitVote = functions.https.onRequest((req, res) => {
 
 // ===== EMAIL FUNCTIONS =====
 
-// Send poll invitation emails
+// Send poll invitation email to single participant
+exports.sendPollInvitation = emailService.sendPollInvitation;
+
+// Send poll invitation emails to all participants
 exports.sendPollInvitations = emailService.sendPollInvitations;
+
+// Send mediation notice email
+exports.sendMediationNotice = emailService.sendMediationNotice;
 
 // Send mediation notice emails
 exports.sendMediationNotices = noticeService.sendMediationNotices;
 
+// Test email configuration
+exports.testEmailConfig = emailService.testEmailConfig;
+
 // Track email opens
 exports.trackEmailOpen = trackingService.trackEmailOpen;
+
+// Submit email vote
+exports.submitEmailVote = trackingService.submitEmailVote;
 
 // ===== FILE FUNCTIONS =====
 
