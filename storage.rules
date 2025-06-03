@@ -1,0 +1,52 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             request.auth.token.userType == 'administrator';
+    }
+    
+    function isMediator() {
+      return isAuthenticated() && 
+             request.auth.token.userType == 'mediator';
+    }
+
+    // Mediation notice PDFs
+    match /notices/{caseId}/{fileName} {
+      // Allow mediators and admins to upload PDFs
+      allow write: if isMediator() || isAdmin();
+      
+      // Allow reading of PDFs for authenticated users
+      allow read: if isAuthenticated();
+      
+      // Validate file type and size
+      allow write: if request.resource.size < 10 * 1024 * 1024 && // 10MB limit
+                      request.resource.contentType == 'application/pdf';
+    }
+
+    // Case documents (if needed in future)
+    match /cases/{caseId}/documents/{fileName} {
+      allow write: if isMediator() || isAdmin();
+      allow read: if isAuthenticated();
+      allow write: if request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+
+    // User profile images (if needed)
+    match /users/{userId}/profile/{fileName} {
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if isAuthenticated();
+      allow write: if request.resource.size < 2 * 1024 * 1024 && // 2MB limit
+                      request.resource.contentType.matches('image/.*');
+    }
+
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
