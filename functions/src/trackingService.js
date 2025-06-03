@@ -5,86 +5,208 @@ const cors = require('cors')({ origin: true });
 const db = admin.firestore();
 
 /**
+ * Validate voting token
+ */
+const validateVotingToken = async (pollId, email, token) => {
+  try {
+    const tokenDoc = await db.collection('pollVotingTokens')
+      .doc(`${pollId}_${email.replace(/[.@]/g, '_')}`)
+      .get();
+    
+    if (!tokenDoc.exists) {
+      return false;
+    }
+    
+    const tokenData = tokenDoc.data();
+    
+    // Check if token matches
+    if (tokenData.token !== token) {
+      return false;
+    }
+    
+    // Check if token is expired
+    if (tokenData.expiresAt && tokenData.expiresAt.toDate() < new Date()) {
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error validating voting token:', error);
+    return false;
+  }
+};
+
+/**
  * Track email opens via pixel tracking
  */
-const trackEmailOpen = functions.https.onRequest((req, res) => {
+const trackEmailOpen = functions.https.onRequest(async (req, res) => {
+  try {
+    const { pollId, email, token } = req.query;
+    
+    // Always return a 1x1 transparent GIF
+    const transparentGif = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+    res.set('Content-Type', 'image/gif');
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    
+    // Validate required fields
+    if (!pollId || !email) {
+      return res.send(transparentGif);
+    }
+    
+    // Validate token if provided
+    if (token) {
+      const isValidToken = await validateVotingToken(pollId, email, token);
+      if (!isValidToken) {
+        return res.send(transparentGif);
+      }
+    }
+    
+    // Update email tracking info
+    const trackingQuery = await db.collection('emailTracking')
+      .where('pollId', '==', pollId)
+      .where('participantEmail', '==', email)
+      .where('type', '==', 'poll_invitation')
+      .limit(1)
+      .get();
+    
+    if (!trackingQuery.empty) {
+      const trackingDoc = trackingQuery.docs[0];
+      const trackingData = trackingDoc.data();
+      
+      // Only update if not already opened
+      if (!trackingData.opened) {
+        await trackingDoc.ref.update({
+          opened: true,
+          openedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Update poll statistics
+        await updatePollEmailStats(pollId);
+      }
+    }
+    
+    return res.send(transparentGif);
+  } catch (error) {
+    console.error('Error tracking email open:', error);
+    // Return transparent GIF even on error
+    const transparentGif = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+    res.set('Content-Type', 'image/gif');
+    return res.send(transparentGif);
+  }
+});
+
+/**
+ * Handle email vote submission
+ */
+const submitEmailVote = functions.https.onRequest((req, res) => {
   cors(req, res, async () => {
     try {
-      const { type, pollId, noticeId, email } = req.query;
-      
-      if (!type || !email) {
-        return res.status(400).json({ error: 'Type and email are required' });
+      // Only allow POST requests
+      if (req.method !== 'POST') {
+        return res.status(405).send('Method Not Allowed');
       }
       
-      // Find the email tracking record
-      let query = db.collection('emailTracking')
-        .where('type', '==', type)
-        .where('participantEmail', '==', email);
+      const { pollId, email, token, source } = req.body;
       
-      if (pollId) {
-        query = query.where('pollId', '==', pollId);
+      // Validate required fields
+      if (!pollId || !email || !token) {
+        return res.status(400).send('Missing required fields');
       }
       
-      if (noticeId) {
-        query = query.where('noticeId', '==', noticeId);
+      // Validate token
+      const isValidToken = await validateVotingToken(pollId, email, token);
+      if (!isValidToken) {
+        return res.status(403).send('Invalid or expired token');
       }
       
-      const trackingSnapshot = await query.limit(1).get();
+      // Get the poll
+      const pollDoc = await db.collection('polls').doc(pollId).get();
+      if (!pollDoc.exists) {
+        return res.status(404).send('Poll not found');
+      }
       
-      if (!trackingSnapshot.empty) {
-        const trackingDoc = trackingSnapshot.docs[0];
-        const trackingData = trackingDoc.data();
-        
-        // Only update if not already opened
-        if (trackingData.status !== 'opened') {
-          await trackingDoc.ref.update({
-            status: 'opened',
-            openedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      const poll = pollDoc.data();
+      
+      // Check if poll is still active
+      if (poll.status !== 'active') {
+        return res.status(400).send('This poll is no longer active');
+      }
+      
+      // Process votes
+      const votes = [];
+      
+      // Extract option IDs and votes from form data
+      for (const key in req.body) {
+        if (key.startsWith('vote_')) {
+          const optionId = key.replace('vote_', '');
+          const voteType = req.body[key];
+          
+          // Validate vote type
+          if (!['yes', 'if_need_be', 'no'].includes(voteType)) {
+            continue;
+          }
+          
+          votes.push({
+            pollId,
+            optionId,
+            participantEmail: email,
+            type: voteType,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            source: source || 'email_form'
           });
-          
-          // Update poll or notice statistics
-          if (pollId) {
-            await updatePollEmailStats(pollId);
-          }
-          
-          if (noticeId) {
-            await updateNoticeEmailStats(noticeId);
-          }
         }
       }
       
-      // Return a 1x1 transparent pixel
-      const pixel = Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-        'base64'
-      );
+      if (votes.length === 0) {
+        return res.status(400).send('No valid votes submitted');
+      }
       
-      res.set({
-        'Content-Type': 'image/png',
-        'Content-Length': pixel.length,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
+      // Delete existing votes for this participant
+      const existingVotesSnapshot = await db.collection('votes')
+        .where('pollId', '==', pollId)
+        .where('participantEmail', '==', email)
+        .get();
+      
+      const batch = db.batch();
+      
+      existingVotesSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
       });
       
-      return res.status(200).send(pixel);
+      // Add new votes
+      for (const vote of votes) {
+        const voteRef = db.collection('votes').doc();
+        batch.set(voteRef, vote);
+      }
       
+      await batch.commit();
+      
+      // Update email tracking info
+      const trackingQuery = await db.collection('emailTracking')
+        .where('pollId', '==', pollId)
+        .where('participantEmail', '==', email)
+        .where('type', '==', 'poll_invitation')
+        .limit(1)
+        .get();
+      
+      if (!trackingQuery.empty) {
+        const trackingDoc = trackingQuery.docs[0];
+        await trackingDoc.ref.update({
+          votedViaEmail: true,
+          votedViaEmailAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      
+      // Redirect to thank you page
+      const baseUrl = req.headers.origin || req.headers.referer || 'http://localhost:3000';
+      res.redirect(303, `${baseUrl}/vote-success?pollId=${pollId}`);
     } catch (error) {
-      console.error('Error tracking email open:', error);
-      
-      // Still return pixel even on error
-      const pixel = Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-        'base64'
-      );
-      
-      res.set({
-        'Content-Type': 'image/png',
-        'Content-Length': pixel.length
-      });
-      
-      return res.status(200).send(pixel);
+      console.error('Error handling email vote submission:', error);
+      res.status(500).send('Internal Server Error');
     }
   });
 });
@@ -329,9 +451,11 @@ const retryFailedEmail = functions.https.onRequest((req, res) => {
 
 module.exports = {
   trackEmailOpen,
+  submitEmailVote,
   getEmailTrackingStats,
   getEmailTrackingRecords,
   retryFailedEmail,
   updatePollEmailStats,
-  updateNoticeEmailStats
+  updateNoticeEmailStats,
+  validateVotingToken
 };

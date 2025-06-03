@@ -1,29 +1,173 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
-const cors = require('cors')({ origin: true });
-const nodemailer = require('nodemailer');
+const fetch = require('node-fetch');
+const { v4: uuidv4 } = require('uuid');
 
 const db = admin.firestore();
 
-// SMTP2Go configuration
-const createTransporter = () => {
-  return nodemailer.createTransporter({
-    host: 'mail.smtp2go.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: functions.config().smtp2go?.username || process.env.SMTP2GO_USERNAME,
-      pass: functions.config().smtp2go?.password || process.env.SMTP2GO_PASSWORD
+// SMTP2Go API configuration
+const SMTP2GO_API_URL = 'https://api.smtp2go.com/v3';
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
+/**
+ * Get SMTP2Go API key from environment
+ */
+const getApiKey = () => {
+  const apiKey = functions.config().smtp2go?.api_key || process.env.SMTP2GO_API_KEY;
+  
+  if (!apiKey) {
+    console.warn('SMTP2Go API key is not configured. Please set SMTP2GO_API_KEY environment variable.');
+    throw new Error('SMTP2Go API key is not configured');
+  }
+  
+  return apiKey;
+};
+
+/**
+ * Get sender email configuration
+ */
+const getSenderConfig = () => {
+  return {
+    name: functions.config().smtp2go?.sender_name || process.env.SMTP2GO_SENDER_NAME || 'Mediation Platform',
+    email: functions.config().smtp2go?.sender_email || process.env.SMTP2GO_SENDER_EMAIL || 'noreply@mediationplatform.com'
+  };
+};
+
+/**
+ * Send email via SMTP2Go API with retry logic
+ */
+const sendEmailWithRetry = async (emailData, retryCount = 0) => {
+  try {
+    const apiKey = getApiKey();
+    
+    const response = await fetch(`${SMTP2GO_API_URL}/email/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        api_key: apiKey,
+        ...emailData
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(`SMTP2Go API error: ${response.status} - ${result.data?.error || response.statusText}`);
     }
-  });
+    
+    return result;
+  } catch (error) {
+    console.error(`Email send attempt ${retryCount + 1} failed:`, error.message);
+    
+    if (retryCount < MAX_RETRIES) {
+      console.log(`Retrying in ${RETRY_DELAY}ms...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+      return sendEmailWithRetry(emailData, retryCount + 1);
+    }
+    
+    throw error;
+  }
+};
+
+/**
+ * Store email tracking information
+ */
+const storeEmailTracking = async (trackingData) => {
+  try {
+    const trackingId = uuidv4();
+    await db.collection('emailTracking').doc(trackingId).set({
+      ...trackingData,
+      id: trackingId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return trackingId;
+  } catch (error) {
+    console.error('Error storing email tracking:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate voting token for poll emails
+ */
+const generateVotingToken = () => {
+  return uuidv4();
+};
+
+/**
+ * Store voting token
+ */
+const storeVotingToken = async (pollId, participantEmail, token) => {
+  try {
+    const tokenId = `${pollId}_${participantEmail.replace(/[.@]/g, '_')}`;
+    await db.collection('pollVotingTokens').doc(tokenId).set({
+      pollId,
+      participantEmail,
+      token,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+      )
+    });
+  } catch (error) {
+    console.error('Error storing voting token:', error);
+    throw error;
+  }
 };
 
 /**
  * Generate poll invitation email HTML
  */
-const generatePollInvitationHTML = (poll, participant, baseUrl) => {
-  const pollUrl = `${baseUrl}/poll/${poll.id}?email=${encodeURIComponent(participant.email)}`;
-  const trackingUrl = `${baseUrl}/api/track-email-open?type=poll_invitation&pollId=${poll.id}&email=${encodeURIComponent(participant.email)}`;
+const generatePollInvitationHTML = (poll, participant, votingToken, baseUrl) => {
+  const participantName = participant.name || participant.email.split('@')[0];
+  const senderConfig = getSenderConfig();
+  
+  // Generate voting options HTML
+  const optionsHtml = poll.options.map((option, index) => {
+    const startTime = option.startTime.toDate();
+    const formattedDate = startTime.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const formattedTime = startTime.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit'
+    });
+    
+    return `
+      <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h3 style="margin-top: 0; margin-bottom: 10px; color: #2d3748;">${formattedDate}</h3>
+        <p style="margin-top: 0; margin-bottom: 15px; color: #4a5568;">${formattedTime}${option.duration ? ` - Duration: ${option.duration} minutes` : ''}</p>
+        
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <label style="display: inline-flex; align-items: center; padding: 8px 16px; background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
+            <input type="radio" name="vote_${option.id}" value="yes" style="margin-right: 8px;">
+            <span style="font-weight: 500; color: #2d3748;">Yes</span>
+          </label>
+          
+          <label style="display: inline-flex; align-items: center; padding: 8px 16px; background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
+            <input type="radio" name="vote_${option.id}" value="if_need_be" style="margin-right: 8px;">
+            <span style="font-weight: 500; color: #2d3748;">If Need Be</span>
+          </label>
+          
+          <label style="display: inline-flex; align-items: center; padding: 8px 16px; background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
+            <input type="radio" name="vote_${option.id}" value="no" style="margin-right: 8px;">
+            <span style="font-weight: 500; color: #2d3748;">No</span>
+          </label>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  const appLink = `${baseUrl}/poll/${poll.id}?email=${encodeURIComponent(participant.email)}&token=${votingToken}`;
+  const trackingPixel = `<img src="${baseUrl}/api/track-email-open?pollId=${poll.id}&email=${encodeURIComponent(participant.email)}&token=${votingToken}" width="1" height="1" alt="" style="display:none;">`;
   
   return `
     <!DOCTYPE html>
@@ -31,233 +175,308 @@ const generatePollInvitationHTML = (poll, participant, baseUrl) => {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Mediation Scheduling Poll</title>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .content { background-color: #ffffff; padding: 20px; border: 1px solid #e9ecef; border-radius: 8px; }
-        .button { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 10px 0; }
-        .case-info { background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0; }
-        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e9ecef; font-size: 12px; color: #6c757d; }
-      </style>
+      <title>Vote on Scheduling Options</title>
     </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Mediation Scheduling Poll</h1>
-          <p>You have been invited to participate in scheduling a mediation session.</p>
+    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background-color: #f8fafc; border-radius: 8px; padding: 30px; margin-bottom: 30px;">
+        <h1 style="margin-top: 0; color: #2d3748; font-size: 24px;">Please Vote on Scheduling Options</h1>
+        <p style="margin-bottom: 20px; color: #4a5568;">Hello ${participantName},</p>
+        <p style="margin-bottom: 20px; color: #4a5568;">You've been invited to vote on scheduling options for:</p>
+        <div style="background-color: #ebf4ff; border-left: 4px solid #4299e1; padding: 15px; margin-bottom: 20px;">
+          <h2 style="margin-top: 0; margin-bottom: 10px; color: #2b6cb0;">${poll.title}</h2>
+          <p style="margin: 0; color: #4a5568;">${poll.description || ''}</p>
+          ${poll.location ? `<p style="margin-top: 10px; margin-bottom: 0; color: #4a5568;"><strong>Location:</strong> ${poll.location}</p>` : ''}
         </div>
         
-        <div class="content">
-          <div class="case-info">
-            <h3>Case Information</h3>
-            <p><strong>Case:</strong> ${poll.caseName || 'N/A'}</p>
-            <p><strong>Case Number:</strong> ${poll.caseNumber || 'N/A'}</p>
-            <p><strong>Mediator:</strong> ${poll.mediatorName || 'N/A'}</p>
-            ${poll.location ? `<p><strong>Location:</strong> ${poll.location}</p>` : ''}
+        <div style="margin-top: 30px;">
+          <h2 style="color: #2d3748; font-size: 20px; margin-bottom: 15px;">Please indicate your availability for each option:</h2>
+          
+          <form action="${baseUrl}/api/submit-email-vote" method="post">
+            <input type="hidden" name="pollId" value="${poll.id}">
+            <input type="hidden" name="email" value="${participant.email}">
+            <input type="hidden" name="token" value="${votingToken}">
+            <input type="hidden" name="source" value="email_form">
+            
+            ${optionsHtml}
+            
+            <div style="margin-top: 30px; margin-bottom: 20px;">
+              <button type="submit" style="padding: 12px 24px; background-color: #4299e1; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                Submit My Votes
+              </button>
+            </div>
+          </form>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+            <p style="margin-bottom: 15px;">Prefer to vote in the app?</p>
+            <a href="${appLink}" style="display: inline-block; padding: 10px 20px; background-color: #edf2f7; color: #4a5568; text-decoration: none; border-radius: 4px; font-weight: 500;">
+              Open in App
+            </a>
           </div>
-          
-          <h3>Poll Details</h3>
-          <p><strong>Title:</strong> ${poll.title}</p>
-          ${poll.description ? `<p><strong>Description:</strong> ${poll.description}</p>` : ''}
-          
-          <p>Please click the button below to view the available time options and submit your availability:</p>
-          
-          <a href="${pollUrl}" class="button">Vote on Scheduling Options</a>
-          
-          <p><strong>Available Time Options:</strong></p>
-          <ul>
-            ${poll.options.map(option => `
-              <li>${new Date(option.date).toLocaleDateString()} at ${option.time} (${option.duration} minutes)</li>
-            `).join('')}
-          </ul>
-          
-          <p><strong>Instructions:</strong></p>
-          <ul>
-            <li>Click the link above to access the voting form</li>
-            <li>For each time option, indicate if you are Available, Unavailable, or if it's your Preferred time</li>
-            <li>You can add notes to explain your availability</li>
-            <li>Submit your response as soon as possible</li>
-          </ul>
-        </div>
-        
-        <div class="footer">
-          <p>This is an automated message from the Mediation Scheduling System.</p>
-          <p>If you have questions, please contact your mediator directly.</p>
-          <img src="${trackingUrl}" width="1" height="1" style="display:none;" alt="">
         </div>
       </div>
+      
+      <div style="text-align: center; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #718096; font-size: 14px;">
+        <p>This is an automated message from ${senderConfig.name}.</p>
+      </div>
+      
+      ${trackingPixel}
     </body>
     </html>
   `;
 };
 
 /**
- * Send poll invitation emails
+ * Send poll invitation email
  */
-const sendPollInvitations = functions.https.onRequest((req, res) => {
-  cors(req, res, async () => {
-    try {
-      const { pollId, baseUrl } = req.body;
-      
-      if (!pollId) {
-        return res.status(400).json({ error: 'Poll ID is required' });
-      }
-      
-      // Get poll data
-      const pollDoc = await db.collection('polls').doc(pollId).get();
-      if (!pollDoc.exists) {
-        return res.status(404).json({ error: 'Poll not found' });
-      }
-      
-      const poll = { id: pollDoc.id, ...pollDoc.data() };
-      
-      if (!poll.participants || poll.participants.length === 0) {
-        return res.status(400).json({ error: 'No participants found in poll' });
-      }
-      
-      const transporter = createTransporter();
-      const results = [];
-      
-      // Send email to each participant
-      for (const participant of poll.participants) {
-        try {
-          const emailHTML = generatePollInvitationHTML(poll, participant, baseUrl || 'http://localhost:3000');
-          
-          const mailOptions = {
-            from: functions.config().smtp2go?.from_email || 'noreply@mediation-scheduling.com',
-            to: participant.email,
-            subject: `Mediation Scheduling Poll - ${poll.caseName || poll.caseNumber}`,
-            html: emailHTML
-          };
-          
-          const info = await transporter.sendMail(mailOptions);
-          
-          // Create email tracking record
-          const trackingData = {
-            type: 'poll_invitation',
-            pollId: pollId,
-            caseId: poll.caseId,
-            participantEmail: participant.email,
-            participantName: participant.name || '',
-            emailId: info.messageId,
-            sentAt: admin.firestore.FieldValue.serverTimestamp(),
-            status: 'sent',
-            emailSubject: mailOptions.subject,
-            hasAttachment: false,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-          };
-          
-          await db.collection('emailTracking').add(trackingData);
-          
-          results.push({
-            email: participant.email,
-            status: 'sent',
-            messageId: info.messageId
-          });
-          
-        } catch (error) {
-          console.error(`Error sending email to ${participant.email}:`, error);
-          
-          // Create failed tracking record
-          const trackingData = {
-            type: 'poll_invitation',
-            pollId: pollId,
-            caseId: poll.caseId,
-            participantEmail: participant.email,
-            participantName: participant.name || '',
-            emailId: '',
-            sentAt: admin.firestore.FieldValue.serverTimestamp(),
-            status: 'failed',
-            emailSubject: `Mediation Scheduling Poll - ${poll.caseName || poll.caseNumber}`,
-            hasAttachment: false,
-            errorMessage: error.message,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-          };
-          
-          await db.collection('emailTracking').add(trackingData);
-          
-          results.push({
-            email: participant.email,
-            status: 'failed',
-            error: error.message
-          });
-        }
-      }
-      
-      // Update poll with email statistics
-      const sentCount = results.filter(r => r.status === 'sent').length;
-      const failedCount = results.filter(r => r.status === 'failed').length;
-      
-      await db.collection('polls').doc(pollId).update({
-        emailsSent: sentCount,
-        emailsDelivered: sentCount, // Will be updated by delivery webhooks
-        lastEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      
-      return res.status(200).json({
-        success: true,
-        totalParticipants: poll.participants.length,
-        emailsSent: sentCount,
-        emailsFailed: failedCount,
-        results: results
-      });
-      
-    } catch (error) {
-      console.error('Error sending poll invitations:', error);
-      return res.status(500).json({ error: 'Failed to send poll invitations' });
+exports.sendPollInvitation = functions.https.onCall(async (data, context) => {
+  try {
+    // Verify authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
-  });
+
+    const { pollId, participantEmail, baseUrl } = data;
+    
+    if (!pollId || !participantEmail || !baseUrl) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters');
+    }
+
+    // Get poll data
+    const pollDoc = await db.collection('polls').doc(pollId).get();
+    if (!pollDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Poll not found');
+    }
+
+    const poll = { id: pollDoc.id, ...pollDoc.data() };
+    
+    // Find participant
+    const participant = poll.participants?.find(p => p.email === participantEmail);
+    if (!participant) {
+      throw new functions.https.HttpsError('not-found', 'Participant not found in poll');
+    }
+
+    // Generate voting token
+    const votingToken = generateVotingToken();
+    await storeVotingToken(pollId, participantEmail, votingToken);
+
+    // Generate email content
+    const htmlBody = generatePollInvitationHTML(poll, participant, votingToken, baseUrl);
+    const senderConfig = getSenderConfig();
+
+    // Prepare email data
+    const emailData = {
+      sender: `${senderConfig.name} <${senderConfig.email}>`,
+      to: [`${participant.name || participant.email} <${participant.email}>`],
+      subject: `Vote on Scheduling Options: ${poll.title}`,
+      html_body: htmlBody,
+      custom_headers: [
+        {
+          header: 'X-Poll-ID',
+          value: pollId
+        },
+        {
+          header: 'X-Participant-Email',
+          value: participantEmail
+        }
+      ]
+    };
+
+    // Send email
+    const response = await sendEmailWithRetry(emailData);
+
+    // Store tracking information
+    const trackingId = await storeEmailTracking({
+      type: 'poll_invitation',
+      pollId,
+      participantEmail,
+      emailId: response.data?.email_id,
+      status: 'sent',
+      sentBy: context.auth.uid
+    });
+
+    return {
+      success: true,
+      emailId: response.data?.email_id,
+      trackingId,
+      participant: participantEmail
+    };
+  } catch (error) {
+    console.error('Error sending poll invitation:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Send poll invitations to all participants
+ */
+exports.sendPollInvitations = functions.https.onCall(async (data, context) => {
+  try {
+    // Verify authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    const { pollId, baseUrl } = data;
+    
+    if (!pollId || !baseUrl) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters');
+    }
+
+    // Get poll data
+    const pollDoc = await db.collection('polls').doc(pollId).get();
+    if (!pollDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Poll not found');
+    }
+
+    const poll = { id: pollDoc.id, ...pollDoc.data() };
+    
+    if (!poll.participants || poll.participants.length === 0) {
+      throw new functions.https.HttpsError('invalid-argument', 'No participants found in poll');
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Send emails to each participant
+    for (const participant of poll.participants) {
+      if (!participant.email) {
+        errors.push({
+          participant: participant.name || 'Unknown',
+          error: 'No email address'
+        });
+        continue;
+      }
+
+      try {
+        const result = await exports.sendPollInvitation.handler({
+          pollId,
+          participantEmail: participant.email,
+          baseUrl
+        }, context);
+        
+        results.push(result);
+      } catch (error) {
+        console.error(`Error sending email to ${participant.email}:`, error);
+        errors.push({
+          participant: participant.email,
+          error: error.message
+        });
+      }
+    }
+
+    return {
+      success: true,
+      sent: results.length,
+      failed: errors.length,
+      results,
+      errors
+    };
+  } catch (error) {
+    console.error('Error sending poll invitations:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Send mediation notice email
+ */
+exports.sendMediationNotice = functions.https.onCall(async (data, context) => {
+  try {
+    // Verify authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    const { noticeId, participantEmail } = data;
+    
+    if (!noticeId || !participantEmail) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters');
+    }
+
+    // Get notice data
+    const noticeDoc = await db.collection('notices').doc(noticeId).get();
+    if (!noticeDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Notice not found');
+    }
+
+    const notice = { id: noticeDoc.id, ...noticeDoc.data() };
+    const senderConfig = getSenderConfig();
+
+    // Prepare email data
+    const emailData = {
+      sender: `${senderConfig.name} <${senderConfig.email}>`,
+      to: [participantEmail],
+      subject: notice.subject,
+      html_body: notice.content,
+      attachments: notice.attachments || []
+    };
+
+    // Send email
+    const response = await sendEmailWithRetry(emailData);
+
+    // Store tracking information
+    const trackingId = await storeEmailTracking({
+      type: 'mediation_notice',
+      noticeId,
+      participantEmail,
+      emailId: response.data?.email_id,
+      status: 'sent',
+      sentBy: context.auth.uid
+    });
+
+    return {
+      success: true,
+      emailId: response.data?.email_id,
+      trackingId,
+      participant: participantEmail
+    };
+  } catch (error) {
+    console.error('Error sending mediation notice:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
 });
 
 /**
  * Test email configuration
  */
-const testEmailConfig = functions.https.onRequest((req, res) => {
-  cors(req, res, async () => {
-    try {
-      const { testEmail } = req.body;
-      
-      if (!testEmail) {
-        return res.status(400).json({ error: 'Test email address is required' });
-      }
-      
-      const transporter = createTransporter();
-      
-      const mailOptions = {
-        from: functions.config().smtp2go?.from_email || 'noreply@mediation-scheduling.com',
-        to: testEmail,
-        subject: 'Email Configuration Test',
-        html: `
-          <h2>Email Configuration Test</h2>
-          <p>This is a test email to verify that the email configuration is working correctly.</p>
-          <p>Sent at: ${new Date().toISOString()}</p>
-        `
-      };
-      
-      const info = await transporter.sendMail(mailOptions);
-      
-      return res.status(200).json({
-        success: true,
-        messageId: info.messageId,
-        message: 'Test email sent successfully'
-      });
-      
-    } catch (error) {
-      console.error('Error testing email configuration:', error);
-      return res.status(500).json({ 
-        error: 'Email configuration test failed',
-        details: error.message 
-      });
+exports.testEmailConfig = functions.https.onCall(async (data, context) => {
+  try {
+    // Verify authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
-  });
-});
 
-module.exports = {
-  sendPollInvitations,
-  testEmailConfig
-};
+    const { testEmail } = data;
+    
+    if (!testEmail) {
+      throw new functions.https.HttpsError('invalid-argument', 'Test email address is required');
+    }
+
+    const senderConfig = getSenderConfig();
+
+    // Prepare test email data
+    const emailData = {
+      sender: `${senderConfig.name} <${senderConfig.email}>`,
+      to: [testEmail],
+      subject: 'Email Configuration Test',
+      html_body: `
+        <h2>Email Configuration Test</h2>
+        <p>This is a test email to verify that the email configuration is working correctly.</p>
+        <p>Sent at: ${new Date().toISOString()}</p>
+        <p>From: ${senderConfig.name} &lt;${senderConfig.email}&gt;</p>
+      `
+    };
+
+    // Send email
+    const response = await sendEmailWithRetry(emailData);
+
+    return {
+      success: true,
+      emailId: response.data?.email_id,
+      message: 'Test email sent successfully'
+    };
+  } catch (error) {
+    console.error('Error testing email configuration:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
