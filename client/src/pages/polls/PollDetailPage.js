@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import PollDetail from '../../components/polling/PollDetail';
-import { getPollById, sendPollInvitations } from '../../services/pollService';
+import { 
+  getPollById, 
+  sendPollInvitations, 
+  finalizePoll,
+  deletePoll,
+  updatePoll 
+} from '../../services/pollService';
 
 const PollDetailPage = () => {
   const { pollId } = useParams();
@@ -46,11 +52,8 @@ const PollDetailPage = () => {
     try {
       setActionLoading(true);
       
-      // TODO: Implement activatePoll service function
-      console.log('Activating poll:', pollId);
-      
-      // Update local state
-      setPoll(prev => ({ ...prev, status: 'active' }));
+      const updatedPoll = await updatePoll(pollId, { status: 'active' });
+      setPoll(updatedPoll);
       
     } catch (error) {
       console.error('Error activating poll:', error);
@@ -64,15 +67,11 @@ const PollDetailPage = () => {
     try {
       setActionLoading(true);
       
-      // TODO: Implement finalizePoll service function
-      console.log('Finalizing poll with option:', selectedOptionId);
+      const result = await finalizePoll(pollId, selectedOptionId);
+      setPoll(result.poll);
       
-      // Update local state
-      setPoll(prev => ({ 
-        ...prev, 
-        status: 'finalized',
-        finalizedOptionId: selectedOptionId
-      }));
+      // Show success message
+      alert('Poll finalized successfully! You can now create a mediation notice.');
       
     } catch (error) {
       console.error('Error finalizing poll:', error);
@@ -86,11 +85,8 @@ const PollDetailPage = () => {
     try {
       setActionLoading(true);
       
-      // TODO: Implement cancelPoll service function
-      console.log('Cancelling poll:', pollId);
-      
-      // Update local state
-      setPoll(prev => ({ ...prev, status: 'cancelled' }));
+      const updatedPoll = await updatePoll(pollId, { status: 'cancelled' });
+      setPoll(updatedPoll);
       
     } catch (error) {
       console.error('Error cancelling poll:', error);
@@ -104,8 +100,7 @@ const PollDetailPage = () => {
     try {
       setActionLoading(true);
       
-      // TODO: Implement deletePoll service function
-      console.log('Deleting poll:', pollId);
+      await deletePoll(pollId);
       
       // Navigate back to polls list
       navigate('/polls');
