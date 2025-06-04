@@ -128,8 +128,20 @@ const generatePollInvitationHTML = (poll, participant, votingToken, baseUrl) => 
   const senderConfig = getSenderConfig();
   
   // Generate voting options HTML
-  const optionsHtml = poll.options.map((option, index) => {
-    const startTime = option.startTime.toDate();
+  const timeOptions = poll.timeOptions || poll.options || [];
+  const optionsHtml = timeOptions.map((option, index) => {
+    // Handle different date formats (Firestore timestamp or Date string)
+    let startTime;
+    if (option.startTime && typeof option.startTime.toDate === 'function') {
+      startTime = option.startTime.toDate();
+    } else if (option.startTime) {
+      startTime = new Date(option.startTime);
+    } else if (option.date && option.time) {
+      startTime = new Date(`${option.date}T${option.time}`);
+    } else {
+      startTime = new Date();
+    }
+    
     const formattedDate = startTime.toLocaleDateString('en-US', { 
       weekday: 'long', 
       year: 'numeric', 
@@ -141,6 +153,8 @@ const generatePollInvitationHTML = (poll, participant, votingToken, baseUrl) => 
       minute: '2-digit'
     });
     
+    const optionId = option.id || `option_${index}`;
+    
     return `
       <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px;">
         <h3 style="margin-top: 0; margin-bottom: 10px; color: #2d3748;">${formattedDate}</h3>
@@ -148,17 +162,17 @@ const generatePollInvitationHTML = (poll, participant, votingToken, baseUrl) => 
         
         <div style="display: flex; flex-wrap: wrap; gap: 10px;">
           <label style="display: inline-flex; align-items: center; padding: 8px 16px; background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
-            <input type="radio" name="vote_${option.id}" value="yes" style="margin-right: 8px;">
+            <input type="radio" name="vote_${optionId}" value="yes" style="margin-right: 8px;">
             <span style="font-weight: 500; color: #2d3748;">Yes</span>
           </label>
           
           <label style="display: inline-flex; align-items: center; padding: 8px 16px; background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
-            <input type="radio" name="vote_${option.id}" value="if_need_be" style="margin-right: 8px;">
+            <input type="radio" name="vote_${optionId}" value="if_need_be" style="margin-right: 8px;">
             <span style="font-weight: 500; color: #2d3748;">If Need Be</span>
           </label>
           
           <label style="display: inline-flex; align-items: center; padding: 8px 16px; background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
-            <input type="radio" name="vote_${option.id}" value="no" style="margin-right: 8px;">
+            <input type="radio" name="vote_${optionId}" value="no" style="margin-right: 8px;">
             <span style="font-weight: 500; color: #2d3748;">No</span>
           </label>
         </div>
@@ -480,3 +494,104 @@ exports.testEmailConfig = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
+
+/**
+ * Send poll invitations to all participants (internal function for poll service)
+ */
+const sendPollInvitationsToParticipants = async (pollId, pollData) => {
+  try {
+    const baseUrl = functions.config().app?.base_url || process.env.APP_BASE_URL || 'http://localhost:3000';
+    
+    if (!pollData.participants || pollData.participants.length === 0) {
+      throw new Error('No participants found in poll');
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Send emails to each participant
+    for (const participant of pollData.participants) {
+      if (!participant.email) {
+        errors.push({
+          participant: participant.name || 'Unknown',
+          error: 'No email address'
+        });
+        continue;
+      }
+
+      try {
+        // Generate voting token
+        const votingToken = generateVotingToken();
+        await storeVotingToken(pollId, participant.email, votingToken);
+
+        // Generate email content
+        const htmlBody = generatePollInvitationHTML(
+          { id: pollId, ...pollData }, 
+          participant, 
+          votingToken, 
+          baseUrl
+        );
+        const senderConfig = getSenderConfig();
+
+        // Prepare email data
+        const emailData = {
+          sender: `${senderConfig.name} <${senderConfig.email}>`,
+          to: [`${participant.name || participant.email} <${participant.email}>`],
+          subject: `Vote on Scheduling Options: ${pollData.title}`,
+          html_body: htmlBody,
+          custom_headers: [
+            {
+              header: 'X-Poll-ID',
+              value: pollId
+            },
+            {
+              header: 'X-Participant-Email',
+              value: participant.email
+            }
+          ]
+        };
+
+        // Send email
+        const response = await sendEmailWithRetry(emailData);
+
+        // Store tracking information
+        const trackingId = await storeEmailTracking({
+          type: 'poll_invitation',
+          pollId,
+          participantEmail: participant.email,
+          emailId: response.data?.email_id,
+          status: 'sent',
+          sentBy: pollData.createdBy
+        });
+
+        results.push({
+          success: true,
+          emailId: response.data?.email_id,
+          trackingId,
+          participant: participant.email
+        });
+      } catch (error) {
+        console.error(`Error sending email to ${participant.email}:`, error);
+        errors.push({
+          participant: participant.email,
+          error: error.message
+        });
+      }
+    }
+
+    return {
+      success: true,
+      sent: results.length,
+      failed: errors.length,
+      results,
+      errors
+    };
+  } catch (error) {
+    console.error('Error sending poll invitations to participants:', error);
+    throw error;
+  }
+};
+
+module.exports = {
+  sendPollInvitationsToParticipants
+};

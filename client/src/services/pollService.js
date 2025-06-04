@@ -134,6 +134,107 @@ export const sendPollInvitations = async (pollId, baseUrl) => {
 };
 
 /**
+ * Get all polls for the current user
+ */
+export const getPolls = async () => {
+  try {
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getPolls`);
+    return response;
+  } catch (error) {
+    console.error('Error getting polls:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get polls for a specific case
+ */
+export const getPollsForCase = async (caseId) => {
+  try {
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getPollsForCase?caseId=${caseId}`);
+    return response;
+  } catch (error) {
+    console.error('Error getting polls for case:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update a poll
+ */
+export const updatePoll = async (pollId, pollData) => {
+  try {
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/updatePoll?pollId=${pollId}`, {
+      method: 'POST',
+      body: JSON.stringify(pollData)
+    });
+    return response;
+  } catch (error) {
+    console.error('Error updating poll:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a poll
+ */
+export const deletePoll = async (pollId) => {
+  try {
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/deletePoll?pollId=${pollId}`, {
+      method: 'DELETE'
+    });
+    return response;
+  } catch (error) {
+    console.error('Error deleting poll:', error);
+    throw error;
+  }
+};
+
+/**
+ * Finalize a poll with selected time option
+ */
+export const finalizePoll = async (pollId, selectedTimeOption) => {
+  try {
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/finalizePoll?pollId=${pollId}`, {
+      method: 'POST',
+      body: JSON.stringify({ selectedTimeOption })
+    });
+    return response;
+  } catch (error) {
+    console.error('Error finalizing poll:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get poll results with analytics
+ */
+export const getPollResults = async (pollId) => {
+  try {
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getPollResults?pollId=${pollId}`);
+    return response;
+  } catch (error) {
+    console.error('Error getting poll results:', error);
+    throw error;
+  }
+};
+
+/**
+ * Send poll invitations using new backend endpoint
+ */
+export const sendPollInvitationsNew = async (pollId) => {
+  try {
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/sendPollInvitations?pollId=${pollId}`, {
+      method: 'POST'
+    });
+    return response;
+  } catch (error) {
+    console.error('Error sending poll invitations:', error);
+    throw error;
+  }
+};
+
+/**
  * Test email configuration
  */
 export const testEmailConfig = async (testEmail) => {

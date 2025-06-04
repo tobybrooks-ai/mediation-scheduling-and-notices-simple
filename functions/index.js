@@ -1,9 +1,18 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
-const cors = require('cors')({ origin: true });
+
+// Initialize production configuration
+const { initializeProductionConfig, getCorsConfig } = require('./src/productionConfig');
+const { performanceMiddleware } = require('./src/performanceOptimizations');
 
 // Initialize Firebase Admin
 admin.initializeApp();
+
+// Initialize production configuration
+const config = initializeProductionConfig();
+
+// Configure CORS with production settings
+const cors = require('cors')(getCorsConfig());
 
 const db = admin.firestore();
 const storage = admin.storage();
@@ -13,6 +22,7 @@ const emailService = require('./src/emailService');
 const noticeService = require('./src/noticeService');
 const fileService = require('./src/fileService');
 const trackingService = require('./src/trackingService');
+const pollService = require('./src/pollService');
 
 // Middleware to verify Firebase Auth token
 const validateFirebaseIdToken = async (req, res, next) => {
@@ -317,6 +327,104 @@ exports.submitVote = functions.https.onRequest((req, res) => {
   });
 });
 
+// Get all polls for a user
+exports.getPolls = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.getPolls(req, res);
+      });
+    } catch (error) {
+      console.error('Error in getPolls:', error);
+      return res.status(500).json({ error: 'Failed to get polls' });
+    }
+  });
+});
+
+// Get polls for a specific case
+exports.getPollsForCase = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.getPollsForCase(req, res);
+      });
+    } catch (error) {
+      console.error('Error in getPollsForCase:', error);
+      return res.status(500).json({ error: 'Failed to get polls for case' });
+    }
+  });
+});
+
+// Update poll
+exports.updatePoll = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.updatePoll(req, res);
+      });
+    } catch (error) {
+      console.error('Error in updatePoll:', error);
+      return res.status(500).json({ error: 'Failed to update poll' });
+    }
+  });
+});
+
+// Delete poll
+exports.deletePoll = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.deletePoll(req, res);
+      });
+    } catch (error) {
+      console.error('Error in deletePoll:', error);
+      return res.status(500).json({ error: 'Failed to delete poll' });
+    }
+  });
+});
+
+// Finalize poll
+exports.finalizePoll = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.finalizePoll(req, res);
+      });
+    } catch (error) {
+      console.error('Error in finalizePoll:', error);
+      return res.status(500).json({ error: 'Failed to finalize poll' });
+    }
+  });
+});
+
+// Get poll results
+exports.getPollResults = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.getPollResults(req, res);
+      });
+    } catch (error) {
+      console.error('Error in getPollResults:', error);
+      return res.status(500).json({ error: 'Failed to get poll results' });
+    }
+  });
+});
+
+// Send poll invitations
+exports.sendPollInvitations = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.sendPollInvitations(req, res);
+      });
+    } catch (error) {
+      console.error('Error in sendPollInvitations:', error);
+      return res.status(500).json({ error: 'Failed to send poll invitations' });
+    }
+  });
+});
+
 // ===== EMAIL FUNCTIONS =====
 
 // Send poll invitation email to single participant
@@ -348,6 +456,12 @@ exports.getUploadUrl = fileService.getUploadUrl;
 // Process uploaded file
 exports.processUploadedFile = fileService.processUploadedFile;
 
+// Delete file
+exports.deleteFile = fileService.deleteFile;
+
+// Get file info
+exports.getFileInfo = fileService.getFileInfo;
+
 // ===== NOTICE FUNCTIONS =====
 
 // Create mediation notice
@@ -361,3 +475,26 @@ exports.updateNotice = noticeService.updateNotice;
 
 // Delete notice
 exports.deleteNotice = noticeService.deleteNotice;
+
+// Send mediation notices
+exports.sendMediationNotices = noticeService.sendMediationNotices;
+
+// ===== HEALTH CHECK AND MONITORING =====
+
+// Import health check functions
+const healthCheck = require('./src/healthCheck');
+
+// Health check endpoint
+exports.health = healthCheck.healthCheck;
+
+// Simple ping endpoint
+exports.ping = healthCheck.ping;
+
+// System information (development only)
+exports.systemInfo = healthCheck.systemInfo;
+
+// Readiness probe
+exports.readiness = healthCheck.readiness;
+
+// Liveness probe
+exports.liveness = healthCheck.liveness;
