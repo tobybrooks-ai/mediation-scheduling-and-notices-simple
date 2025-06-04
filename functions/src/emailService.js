@@ -128,8 +128,20 @@ const generatePollInvitationHTML = (poll, participant, votingToken, baseUrl) => 
   const senderConfig = getSenderConfig();
   
   // Generate voting options HTML
-  const optionsHtml = poll.options.map((option, index) => {
-    const startTime = option.startTime.toDate();
+  const timeOptions = poll.timeOptions || poll.options || [];
+  const optionsHtml = timeOptions.map((option, index) => {
+    // Handle different date formats (Firestore timestamp or Date string)
+    let startTime;
+    if (option.startTime && typeof option.startTime.toDate === 'function') {
+      startTime = option.startTime.toDate();
+    } else if (option.startTime) {
+      startTime = new Date(option.startTime);
+    } else if (option.date && option.time) {
+      startTime = new Date(`${option.date}T${option.time}`);
+    } else {
+      startTime = new Date();
+    }
+    
     const formattedDate = startTime.toLocaleDateString('en-US', { 
       weekday: 'long', 
       year: 'numeric', 
@@ -141,6 +153,8 @@ const generatePollInvitationHTML = (poll, participant, votingToken, baseUrl) => 
       minute: '2-digit'
     });
     
+    const optionId = option.id || `option_${index}`;
+    
     return `
       <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px;">
         <h3 style="margin-top: 0; margin-bottom: 10px; color: #2d3748;">${formattedDate}</h3>
@@ -148,17 +162,17 @@ const generatePollInvitationHTML = (poll, participant, votingToken, baseUrl) => 
         
         <div style="display: flex; flex-wrap: wrap; gap: 10px;">
           <label style="display: inline-flex; align-items: center; padding: 8px 16px; background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
-            <input type="radio" name="vote_${option.id}" value="yes" style="margin-right: 8px;">
+            <input type="radio" name="vote_${optionId}" value="yes" style="margin-right: 8px;">
             <span style="font-weight: 500; color: #2d3748;">Yes</span>
           </label>
           
           <label style="display: inline-flex; align-items: center; padding: 8px 16px; background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
-            <input type="radio" name="vote_${option.id}" value="if_need_be" style="margin-right: 8px;">
+            <input type="radio" name="vote_${optionId}" value="if_need_be" style="margin-right: 8px;">
             <span style="font-weight: 500; color: #2d3748;">If Need Be</span>
           </label>
           
           <label style="display: inline-flex; align-items: center; padding: 8px 16px; background-color: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
-            <input type="radio" name="vote_${option.id}" value="no" style="margin-right: 8px;">
+            <input type="radio" name="vote_${optionId}" value="no" style="margin-right: 8px;">
             <span style="font-weight: 500; color: #2d3748;">No</span>
           </label>
         </div>

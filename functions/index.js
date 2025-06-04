@@ -466,3 +466,6 @@ exports.updateNotice = noticeService.updateNotice;
 
 // Delete notice
 exports.deleteNotice = noticeService.deleteNotice;
+
+// Send mediation notices
+exports.sendMediationNotices = noticeService.sendMediationNotices;
