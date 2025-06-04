@@ -447,6 +447,12 @@ exports.getUploadUrl = fileService.getUploadUrl;
 // Process uploaded file
 exports.processUploadedFile = fileService.processUploadedFile;
 
+// Delete file
+exports.deleteFile = fileService.deleteFile;
+
+// Get file info
+exports.getFileInfo = fileService.getFileInfo;
+
 // ===== NOTICE FUNCTIONS =====
 
 // Create mediation notice
