@@ -19,6 +19,7 @@ const DashboardLayout = ({ children, title = 'Dashboard' }) => {
     { name: 'Cases', href: '/cases', icon: '📁' },
     { name: 'Polls', href: '/polls', icon: '📊' },
     { name: 'Notices', href: '/notices', icon: '📄' },
+    { name: 'Activity Timeline', href: '/activity-timeline', icon: '📅' },
     { name: 'Email Tracking', href: '/email-tracking', icon: '📧' }
   ];
 
