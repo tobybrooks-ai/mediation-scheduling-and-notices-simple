@@ -1,9 +1,18 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
-const cors = require('cors')({ origin: true });
+
+// Initialize production configuration
+const { initializeProductionConfig, getCorsConfig } = require('./src/productionConfig');
+const { performanceMiddleware } = require('./src/performanceOptimizations');
 
 // Initialize Firebase Admin
 admin.initializeApp();
+
+// Initialize production configuration
+const config = initializeProductionConfig();
+
+// Configure CORS with production settings
+const cors = require('cors')(getCorsConfig());
 
 const db = admin.firestore();
 const storage = admin.storage();
@@ -469,3 +478,23 @@ exports.deleteNotice = noticeService.deleteNotice;
 
 // Send mediation notices
 exports.sendMediationNotices = noticeService.sendMediationNotices;
+
+// ===== HEALTH CHECK AND MONITORING =====
+
+// Import health check functions
+const healthCheck = require('./src/healthCheck');
+
+// Health check endpoint
+exports.health = healthCheck.healthCheck;
+
+// Simple ping endpoint
+exports.ping = healthCheck.ping;
+
+// System information (development only)
+exports.systemInfo = healthCheck.systemInfo;
+
+// Readiness probe
+exports.readiness = healthCheck.readiness;
+
+// Liveness probe
+exports.liveness = healthCheck.liveness;
