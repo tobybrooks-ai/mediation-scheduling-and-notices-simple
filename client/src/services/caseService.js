@@ -1,4 +1,5 @@
 import { getCurrentUserToken } from './authService';
+import { getMockCases, getMockCase } from './mockDataService';
 
 const API_BASE_URL = process.env.REACT_APP_FUNCTIONS_URL || 'http://localhost:5001/mediation-scheduling-simple/us-central1';
 
@@ -38,6 +39,11 @@ const makeAuthenticatedRequest = async (url, options = {}) => {
  * Get all cases for the current user
  */
 export const getCases = async () => {
+  // Use mock data in development mode
+  if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
+    return await getMockCases();
+  }
+  
   try {
     const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getCases`);
     return response;
@@ -51,6 +57,11 @@ export const getCases = async () => {
  * Get a case by ID
  */
 export const getCaseById = async (caseId) => {
+  // Use mock data in development mode
+  if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
+    return await getMockCase(caseId);
+  }
+  
   try {
     const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getCaseById?caseId=${caseId}`);
     return response;

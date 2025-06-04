@@ -1,25 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { formatDate, toDate, isToday, isWithinLastWeek, isWithinLastMonth, sortByTimestamp } from '../../utils/dateUtils';
 
 const ActivityTimeline = ({ activities = [], loading = false, showFilters = true }) => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    try {
-      const date = new Date(timestamp.seconds * 1000);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return 'Invalid date';
-    }
-  };
+
 
   const getActivityIcon = (type) => {
     switch (type) {
@@ -227,20 +214,15 @@ const ActivityTimeline = ({ activities = [], loading = false, showFilters = true
     
     let matchesDate = true;
     if (dateFilter !== 'all' && activity.createdAt) {
-      const activityDate = new Date(activity.createdAt.seconds * 1000);
-      const now = new Date();
-      
       switch (dateFilter) {
         case 'today':
-          matchesDate = activityDate.toDateString() === now.toDateString();
+          matchesDate = isToday(activity.createdAt);
           break;
         case 'week':
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          matchesDate = activityDate >= weekAgo;
+          matchesDate = isWithinLastWeek(activity.createdAt);
           break;
         case 'month':
-          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          matchesDate = activityDate >= monthAgo;
+          matchesDate = isWithinLastMonth(activity.createdAt);
           break;
         default:
           matchesDate = true;
@@ -251,11 +233,7 @@ const ActivityTimeline = ({ activities = [], loading = false, showFilters = true
   });
 
   // Sort activities by date (newest first)
-  const sortedActivities = [...filteredActivities].sort((a, b) => {
-    const dateA = a.createdAt ? new Date(a.createdAt.seconds * 1000) : new Date(0);
-    const dateB = b.createdAt ? new Date(b.createdAt.seconds * 1000) : new Date(0);
-    return dateB - dateA;
-  });
+  const sortedActivities = sortByTimestamp(filteredActivities, 'createdAt', 'desc');
 
   if (loading) {
     return (

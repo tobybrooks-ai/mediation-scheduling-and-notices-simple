@@ -12,6 +12,7 @@ import {
   canDeleteCase
 } from '../../models/CaseModel';
 import CaseTimeline from './CaseTimeline';
+import { formatDate, toDate, sortByTimestamp } from '../../utils/dateUtils';
 
 const CaseStatusBadge = ({ status }) => {
   const getStatusColor = (status) => {
@@ -67,21 +68,7 @@ const CaseDetail = ({
   const [showConfirmDialog, setShowConfirmDialog] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    try {
-      const date = new Date(timestamp.seconds * 1000);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return 'Invalid date';
-    }
-  };
+
 
   const handleAction = (action) => {
     switch (action) {
@@ -126,13 +113,8 @@ const CaseDetail = ({
   };
 
   // Get latest poll and notice
-  const latestPoll = polls.sort((a, b) => 
-    new Date(b.createdAt?.seconds * 1000) - new Date(a.createdAt?.seconds * 1000)
-  )[0];
-
-  const latestNotice = notices.sort((a, b) => 
-    new Date(b.createdAt?.seconds * 1000) - new Date(a.createdAt?.seconds * 1000)
-  )[0];
+  const latestPoll = sortByTimestamp(polls, 'createdAt', 'desc')[0];
+  const latestNotice = sortByTimestamp(notices, 'createdAt', 'desc')[0];
 
   if (loading) {
     return (

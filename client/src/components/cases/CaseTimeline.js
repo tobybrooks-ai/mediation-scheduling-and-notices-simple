@@ -1,21 +1,8 @@
 import React from 'react';
+import { formatDate, sortByTimestamp } from '../../utils/dateUtils';
 
 const CaseTimeline = ({ activities = [] }) => {
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    try {
-      const date = new Date(timestamp.seconds * 1000);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return 'Invalid date';
-    }
-  };
+
 
   const getActivityIcon = (type) => {
     switch (type) {
@@ -139,11 +126,7 @@ const CaseTimeline = ({ activities = [] }) => {
   };
 
   // Sort activities by date (newest first)
-  const sortedActivities = [...activities].sort((a, b) => {
-    const dateA = a.createdAt ? new Date(a.createdAt.seconds * 1000) : new Date(0);
-    const dateB = b.createdAt ? new Date(b.createdAt.seconds * 1000) : new Date(0);
-    return dateB - dateA;
-  });
+  const sortedActivities = sortByTimestamp(activities, 'createdAt', 'desc');
 
   if (activities.length === 0) {
     return (

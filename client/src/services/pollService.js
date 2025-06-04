@@ -1,6 +1,7 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../config/firebase';
 import { getCurrentUserToken } from './authService';
+import { getMockPolls, getMockPollsForCase } from './mockDataService';
 
 const API_BASE_URL = process.env.REACT_APP_FUNCTIONS_URL || 'http://localhost:5001/mediation-scheduling-simple/us-central1';
 
@@ -137,6 +138,11 @@ export const sendPollInvitations = async (pollId, baseUrl) => {
  * Get all polls for the current user
  */
 export const getPolls = async () => {
+  // Use mock data in development mode
+  if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
+    return await getMockPolls();
+  }
+  
   try {
     const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getPolls`);
     return response;
@@ -150,6 +156,11 @@ export const getPolls = async () => {
  * Get polls for a specific case
  */
 export const getPollsForCase = async (caseId) => {
+  // Use mock data in development mode
+  if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
+    return await getMockPollsForCase(caseId);
+  }
+  
   try {
     const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getPollsForCase?caseId=${caseId}`);
     return response;

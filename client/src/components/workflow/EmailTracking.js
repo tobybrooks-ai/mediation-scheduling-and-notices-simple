@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatDate, toDate, sortByTimestamp } from '../../utils/dateUtils';
 import { Link } from 'react-router-dom';
 
 const EmailTracking = ({ emailTracking = [], loading = false }) => {
@@ -8,21 +9,7 @@ const EmailTracking = ({ emailTracking = [], loading = false }) => {
   const [sortBy, setSortBy] = useState('sentAt');
   const [sortOrder, setSortOrder] = useState('desc');
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    try {
-      const date = new Date(timestamp.seconds * 1000);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return 'Invalid date';
-    }
-  };
+
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -97,12 +84,12 @@ const EmailTracking = ({ emailTracking = [], loading = false }) => {
           bValue = b.participantEmail || '';
           break;
         case 'sentAt':
-          aValue = a.sentAt ? new Date(a.sentAt.seconds * 1000) : new Date(0);
-          bValue = b.sentAt ? new Date(b.sentAt.seconds * 1000) : new Date(0);
+          aValue = toDate(a.sentAt) || new Date(0);
+          bValue = toDate(b.sentAt) || new Date(0);
           break;
         case 'openedAt':
-          aValue = a.openedAt ? new Date(a.openedAt.seconds * 1000) : new Date(0);
-          bValue = b.openedAt ? new Date(b.openedAt.seconds * 1000) : new Date(0);
+          aValue = toDate(a.openedAt) || new Date(0);
+          bValue = toDate(b.openedAt) || new Date(0);
           break;
         case 'status':
           aValue = a.status || '';

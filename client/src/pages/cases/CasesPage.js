@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CaseList from '../../components/cases/CaseList';
 import { getCases, deleteCase } from '../../services/caseService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 
 const CasesPage = () => {
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useAuthContext();
 
   useEffect(() => {
     loadCases();

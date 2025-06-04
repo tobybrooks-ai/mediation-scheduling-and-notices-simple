@@ -1,9 +1,9 @@
 import React from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import AuthPage from '../../pages/AuthPage';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
-  const { loading, isAuthenticated, isAdmin } = useAuth();
+  const { loading, isAuthenticated, isAdmin } = useAuthContext();
 
   if (loading) {
     return (

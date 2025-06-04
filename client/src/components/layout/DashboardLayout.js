@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import { signOutUser } from '../../services/authService';
 
 const DashboardLayout = ({ children, title = 'Dashboard' }) => {
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleSignOut = async () => {

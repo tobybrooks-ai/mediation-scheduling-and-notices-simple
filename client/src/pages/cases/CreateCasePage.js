@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CaseForm from '../../components/cases/CaseForm';
 import { createCase } from '../../services/caseService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 
 const CreateCasePage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useAuthContext();
 
   const handleSubmit = async (formData) => {
     try {

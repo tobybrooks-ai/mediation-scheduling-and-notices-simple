@@ -1,4 +1,5 @@
 import { getCurrentUserToken } from './authService';
+import { getMockNotices, getMockNoticesForCase, getMockEmailTracking } from './mockDataService';
 
 const API_BASE_URL = process.env.REACT_APP_FUNCTIONS_URL || 'http://localhost:5001/mediation-scheduling-simple/us-central1';
 
@@ -54,6 +55,11 @@ export const createNotice = async (noticeData) => {
  * Get notices for a case
  */
 export const getNoticesForCase = async (caseId) => {
+  // Use mock data in development mode
+  if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
+    return await getMockNoticesForCase(caseId);
+  }
+  
   try {
     const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getNoticesForCase?caseId=${caseId}`);
     return response;
@@ -371,6 +377,11 @@ export const generateNoticeSummary = (notice) => {
  * Get all notices (alias for getNoticesForCase with no case filter)
  */
 export const getNotices = async () => {
+  // Use mock data in development mode
+  if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
+    return await getMockNotices();
+  }
+  
   try {
     const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getNotices`);
     return response;
@@ -384,6 +395,11 @@ export const getNotices = async () => {
  * Get email tracking data
  */
 export const getEmailTracking = async () => {
+  // Use mock data in development mode
+  if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
+    return await getMockEmailTracking();
+  }
+  
   try {
     const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getEmailTracking`);
     return response;

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import PollList from '../../components/polling/PollList';
 import { getPolls, deletePoll } from '../../services/pollService';
 
 const PollsPage = () => {
   const navigate = useNavigate();
-  // const { } = useAuth(); // Not currently needed
+  // const { } = useAuthContext(); // Not currently needed
   const [polls, setPolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

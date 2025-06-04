@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { signIn, resetPassword } from '../../services/authService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 
 const LoginForm = ({ onSwitchToSignup }) => {
   const [formData, setFormData] = useState({
@@ -10,7 +10,7 @@ const LoginForm = ({ onSwitchToSignup }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resetEmailSent, setResetEmailSent] = useState(false);
-  const { setError: setAuthError } = useAuth();
+  const { signIn: authSignIn, setError: setAuthError } = useAuthContext();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,12 +27,17 @@ const LoginForm = ({ onSwitchToSignup }) => {
     setError('');
 
     try {
-      await signIn(formData.email, formData.password);
+      // Use mock auth if enabled, otherwise use Firebase auth service
+      if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
+        await authSignIn(formData.email, formData.password);
+      } else {
+        await signIn(formData.email, formData.password);
+      }
       // Navigation will be handled by the auth state change
     } catch (error) {
       console.error('Login error:', error);
       setError(getErrorMessage(error.code || error.message));
-      setAuthError(error.message);
+      if (setAuthError) setAuthError(error.message);
     } finally {
       setLoading(false);
     }

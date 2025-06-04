@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import EmailTracking from '../../components/workflow/EmailTracking';
 import { getEmailTracking } from '../../services/noticeService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 
 const EmailTrackingPage = () => {
   const [emailTracking, setEmailTracking] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { user } = useAuth();
+  const { user } = useAuthContext();
 
   useEffect(() => {
     loadEmailTracking();

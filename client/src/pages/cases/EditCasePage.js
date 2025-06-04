@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CaseForm from '../../components/cases/CaseForm';
 import { getCaseById, updateCase } from '../../services/caseService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 
 const EditCasePage = () => {
   const { id } = useParams();
@@ -11,7 +11,7 @@ const EditCasePage = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useAuthContext();
 
   const loadCase = useCallback(async () => {
     try {

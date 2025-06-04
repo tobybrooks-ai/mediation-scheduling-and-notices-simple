@@ -4,7 +4,7 @@ import CaseDetail from '../../components/cases/CaseDetail';
 import { getCaseById, updateCase, deleteCase } from '../../services/caseService';
 import { getPollsForCase } from '../../services/pollService';
 import { getNoticesForCase } from '../../services/noticeService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 
 const CaseDetailPage = () => {
   const { id } = useParams();
@@ -15,7 +15,7 @@ const CaseDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useAuthContext();
 
   const loadCaseData = useCallback(async () => {
     try {

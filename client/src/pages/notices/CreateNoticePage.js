@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import NoticeForm from '../../components/notices/NoticeForm';
 import { getCases } from '../../services/caseService';
 import { getPollById } from '../../services/pollService';
@@ -8,7 +8,7 @@ import { createNoticeFromCaseAndPoll } from '../../models/NoticeModel';
 
 const CreateNoticePage = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser } = useAuthContext();
   const [searchParams] = useSearchParams();
   const pollId = searchParams.get('pollId');
   const caseId = searchParams.get('caseId');

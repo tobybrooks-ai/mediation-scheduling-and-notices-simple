@@ -3,13 +3,13 @@ import ActivityTimeline from '../../components/workflow/ActivityTimeline';
 import { getCases } from '../../services/caseService';
 import { getPolls } from '../../services/pollService';
 import { getNotices } from '../../services/noticeService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 
 const ActivityTimelinePage = () => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { user } = useAuth();
+  const { user } = useAuthContext();
 
   useEffect(() => {
     loadActivities();

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { MockAuthProvider } from './contexts/MockAuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import AuthPage from './pages/AuthPage';
@@ -29,8 +30,12 @@ import EmailTrackingPage from './pages/workflow/EmailTrackingPage';
 import './index.css';
 
 function App() {
+  // Use mock auth in development for testing
+  const useMockAuth = process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_MOCK_AUTH === 'true';
+  
   return (
     <AuthProvider>
+      <MockAuthProvider>
       <Router>
         <div className="App">
           <Routes>
@@ -177,6 +182,7 @@ function App() {
           </Routes>
         </div>
       </Router>
+      </MockAuthProvider>
     </AuthProvider>
   );
 }

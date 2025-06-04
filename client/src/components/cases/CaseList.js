@@ -9,6 +9,7 @@ import {
   getCaseParticipantCount,
   formatCaseDateTime
 } from '../../models/CaseModel';
+import { formatDate, toDate, sortByTimestamp } from '../../utils/dateUtils';
 
 const CaseStatusBadge = ({ status }) => {
   const getStatusColor = (status) => {
@@ -86,8 +87,8 @@ const CaseList = ({ cases, loading, onCreateCase, onDeleteCase }) => {
           bValue = b.caseNumber || '';
           break;
         case 'createdAt':
-          aValue = a.createdAt ? new Date(a.createdAt.seconds * 1000) : new Date(0);
-          bValue = b.createdAt ? new Date(b.createdAt.seconds * 1000) : new Date(0);
+          aValue = toDate(a.createdAt) || new Date(0);
+          bValue = toDate(b.createdAt) || new Date(0);
           break;
         case 'scheduledDate':
           aValue = a.scheduledDate ? new Date(a.scheduledDate) : new Date(0);
@@ -114,19 +115,7 @@ const CaseList = ({ cases, loading, onCreateCase, onDeleteCase }) => {
       return 0;
     });
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    try {
-      const date = new Date(timestamp.seconds * 1000);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch (error) {
-      return 'Invalid date';
-    }
-  };
+
 
   if (loading) {
     return (

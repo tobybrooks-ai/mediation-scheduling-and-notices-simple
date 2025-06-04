@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/layout/DashboardLayout';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuthContext } from '../hooks/useAuthContext';
 import { getCases } from '../services/caseService';
 import { testEmailConfig } from '../services/pollService';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const [stats, setStats] = useState({
     totalCases: 0,
     activeCases: 0,

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import NoticeDetail from '../../components/notices/NoticeDetail';
 
 const NoticeDetailPage = () => {
   const { noticeId } = useParams();
   const navigate = useNavigate();
-  // const { } = useAuth(); // Not currently needed
+  // const { } = useAuthContext(); // Not currently needed
   const [notice, setNotice] = useState(null);
   const [emailTracking, setEmailTracking] = useState([]);
   const [loading, setLoading] = useState(true);

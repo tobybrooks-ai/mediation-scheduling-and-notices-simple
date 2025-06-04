@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import PollDetail from '../../components/polling/PollDetail';
 import { 
   getPollById, 
@@ -13,7 +13,7 @@ import {
 const PollDetailPage = () => {
   const { pollId } = useParams();
   const navigate = useNavigate();
-  // const { } = useAuth(); // Not currently needed
+  // const { } = useAuthContext(); // Not currently needed
   const [poll, setPoll] = useState(null);
   const [votes, setVotes] = useState([]);
   const [loading, setLoading] = useState(true);
