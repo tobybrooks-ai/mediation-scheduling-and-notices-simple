@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CaseDetail from '../../components/cases/CaseDetail';
-import { getCase, updateCase, deleteCase } from '../../services/caseService';
-import { getPollsByCase } from '../../services/pollService';
-import { getNoticesByCase } from '../../services/noticeService';
+import { getCaseById, updateCase, deleteCase } from '../../services/caseService';
+import { getPollsForCase } from '../../services/pollService';
+import { getNoticesForCase } from '../../services/noticeService';
 import { useAuth } from '../../contexts/AuthContext';
 
 const CaseDetailPage = () => {
@@ -17,27 +17,21 @@ const CaseDetailPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (id) {
-      loadCaseData();
-    }
-  }, [id]);
-
-  const loadCaseData = async () => {
+  const loadCaseData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
 
       // Load case data
-      const caseData = await getCase(id);
+      const caseData = await getCaseById(id);
       setCase(caseData);
 
       // Load related polls
-      const pollsData = await getPollsByCase(id);
+      const pollsData = await getPollsForCase(id);
       setPolls(pollsData);
 
       // Load related notices
-      const noticesData = await getNoticesByCase(id);
+      const noticesData = await getNoticesForCase(id);
       setNotices(noticesData);
 
       // Generate activities from case, polls, and notices
@@ -168,7 +162,13 @@ const CaseDetailPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadCaseData();
+    }
+  }, [id, loadCaseData]);
 
   const handleUpdateCase = async (updateData) => {
     try {

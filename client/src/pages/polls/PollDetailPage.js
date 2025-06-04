@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import PollDetail from '../../components/polling/PollDetail';
@@ -13,21 +13,14 @@ import {
 const PollDetailPage = () => {
   const { pollId } = useParams();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  // const { } = useAuth(); // Not currently needed
   const [poll, setPoll] = useState(null);
   const [votes, setVotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Load poll data on component mount
-  useEffect(() => {
-    if (pollId) {
-      loadPollData();
-    }
-  }, [pollId]);
-
-  const loadPollData = async () => {
+  const loadPollData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -46,7 +39,14 @@ const PollDetailPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pollId]);
+
+  // Load poll data on component mount
+  useEffect(() => {
+    if (pollId) {
+      loadPollData();
+    }
+  }, [pollId, loadPollData]);
 
   const handleActivatePoll = async () => {
     try {

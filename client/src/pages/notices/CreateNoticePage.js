@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import NoticeForm from '../../components/notices/NoticeForm';
@@ -14,18 +14,13 @@ const CreateNoticePage = () => {
   const caseId = searchParams.get('caseId');
 
   const [cases, setCases] = useState([]);
-  const [polls, setPolls] = useState([]);
+  const [polls] = useState([]);
   const [initialNoticeData, setInitialNoticeData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [casesLoading, setCasesLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Load cases and poll data on component mount
-  useEffect(() => {
-    loadInitialData();
-  }, [pollId, caseId]);
-
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     try {
       setCasesLoading(true);
       setError('');
@@ -87,7 +82,12 @@ const CreateNoticePage = () => {
     } finally {
       setCasesLoading(false);
     }
-  };
+  }, [pollId, caseId, currentUser.uid]);
+
+  // Load cases and poll data on component mount
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
 
   const handleSubmit = async (noticeData) => {
     try {

@@ -6,7 +6,7 @@ import { getPolls, deletePoll } from '../../services/pollService';
 
 const PollsPage = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  // const { } = useAuth(); // Not currently needed
   const [polls, setPolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

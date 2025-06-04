@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CaseForm from '../../components/cases/CaseForm';
-import { getCase, updateCase } from '../../services/caseService';
+import { getCaseById, updateCase } from '../../services/caseService';
 import { useAuth } from '../../contexts/AuthContext';
 
 const EditCasePage = () => {
@@ -13,17 +13,11 @@ const EditCasePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (id) {
-      loadCase();
-    }
-  }, [id]);
-
-  const loadCase = async () => {
+  const loadCase = useCallback(async () => {
     try {
       setInitialLoading(true);
       setError('');
-      const caseData = await getCase(id);
+      const caseData = await getCaseById(id);
       setCase(caseData);
     } catch (error) {
       console.error('Error loading case:', error);
@@ -31,7 +25,13 @@ const EditCasePage = () => {
     } finally {
       setInitialLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadCase();
+    }
+  }, [id, loadCase]);
 
   const handleSubmit = async (formData) => {
     try {

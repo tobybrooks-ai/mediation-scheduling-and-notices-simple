@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import AuthPage from '../../pages/AuthPage';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
-  const { user, loading, isAuthenticated, isAdmin } = useAuth();
+  const { loading, isAuthenticated, isAdmin } = useAuth();
 
   if (loading) {
     return (

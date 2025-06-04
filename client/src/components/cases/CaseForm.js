@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   CaseType, 
   CaseStatus, 
-  createCase, 
   validateCaseData,
   getCaseTypeOptions,
   getCaseStatusOptions

@@ -366,3 +366,29 @@ export const generateNoticeSummary = (notice) => {
     ]
   };
 };
+
+/**
+ * Get all notices (alias for getNoticesForCase with no case filter)
+ */
+export const getNotices = async () => {
+  try {
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getNotices`);
+    return response;
+  } catch (error) {
+    console.error('Error getting notices:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get email tracking data
+ */
+export const getEmailTracking = async () => {
+  try {
+    const response = await makeAuthenticatedRequest(`${API_BASE_URL}/getEmailTracking`);
+    return response;
+  } catch (error) {
+    console.error('Error getting email tracking:', error);
+    throw error;
+  }
+};

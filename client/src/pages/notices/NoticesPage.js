@@ -5,7 +5,7 @@ import NoticeList from '../../components/notices/NoticeList';
 
 const NoticesPage = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  // const { } = useAuth(); // Not currently needed
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
