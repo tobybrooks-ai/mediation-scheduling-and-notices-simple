@@ -480,3 +480,104 @@ exports.testEmailConfig = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
+
+/**
+ * Send poll invitations to all participants (internal function for poll service)
+ */
+const sendPollInvitationsToParticipants = async (pollId, pollData) => {
+  try {
+    const baseUrl = functions.config().app?.base_url || process.env.APP_BASE_URL || 'http://localhost:3000';
+    
+    if (!pollData.participants || pollData.participants.length === 0) {
+      throw new Error('No participants found in poll');
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Send emails to each participant
+    for (const participant of pollData.participants) {
+      if (!participant.email) {
+        errors.push({
+          participant: participant.name || 'Unknown',
+          error: 'No email address'
+        });
+        continue;
+      }
+
+      try {
+        // Generate voting token
+        const votingToken = generateVotingToken();
+        await storeVotingToken(pollId, participant.email, votingToken);
+
+        // Generate email content
+        const htmlBody = generatePollInvitationHTML(
+          { id: pollId, ...pollData }, 
+          participant, 
+          votingToken, 
+          baseUrl
+        );
+        const senderConfig = getSenderConfig();
+
+        // Prepare email data
+        const emailData = {
+          sender: `${senderConfig.name} <${senderConfig.email}>`,
+          to: [`${participant.name || participant.email} <${participant.email}>`],
+          subject: `Vote on Scheduling Options: ${pollData.title}`,
+          html_body: htmlBody,
+          custom_headers: [
+            {
+              header: 'X-Poll-ID',
+              value: pollId
+            },
+            {
+              header: 'X-Participant-Email',
+              value: participant.email
+            }
+          ]
+        };
+
+        // Send email
+        const response = await sendEmailWithRetry(emailData);
+
+        // Store tracking information
+        const trackingId = await storeEmailTracking({
+          type: 'poll_invitation',
+          pollId,
+          participantEmail: participant.email,
+          emailId: response.data?.email_id,
+          status: 'sent',
+          sentBy: pollData.createdBy
+        });
+
+        results.push({
+          success: true,
+          emailId: response.data?.email_id,
+          trackingId,
+          participant: participant.email
+        });
+      } catch (error) {
+        console.error(`Error sending email to ${participant.email}:`, error);
+        errors.push({
+          participant: participant.email,
+          error: error.message
+        });
+      }
+    }
+
+    return {
+      success: true,
+      sent: results.length,
+      failed: errors.length,
+      results,
+      errors
+    };
+  } catch (error) {
+    console.error('Error sending poll invitations to participants:', error);
+    throw error;
+  }
+};
+
+module.exports = {
+  sendPollInvitationsToParticipants
+};

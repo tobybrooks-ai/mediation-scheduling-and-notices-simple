@@ -13,6 +13,7 @@ const emailService = require('./src/emailService');
 const noticeService = require('./src/noticeService');
 const fileService = require('./src/fileService');
 const trackingService = require('./src/trackingService');
+const pollService = require('./src/pollService');
 
 // Middleware to verify Firebase Auth token
 const validateFirebaseIdToken = async (req, res, next) => {
@@ -313,6 +314,104 @@ exports.submitVote = functions.https.onRequest((req, res) => {
     } catch (error) {
       console.error('Error submitting vote:', error);
       return res.status(500).json({ error: 'Failed to submit vote' });
+    }
+  });
+});
+
+// Get all polls for a user
+exports.getPolls = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.getPolls(req, res);
+      });
+    } catch (error) {
+      console.error('Error in getPolls:', error);
+      return res.status(500).json({ error: 'Failed to get polls' });
+    }
+  });
+});
+
+// Get polls for a specific case
+exports.getPollsForCase = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.getPollsForCase(req, res);
+      });
+    } catch (error) {
+      console.error('Error in getPollsForCase:', error);
+      return res.status(500).json({ error: 'Failed to get polls for case' });
+    }
+  });
+});
+
+// Update poll
+exports.updatePoll = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.updatePoll(req, res);
+      });
+    } catch (error) {
+      console.error('Error in updatePoll:', error);
+      return res.status(500).json({ error: 'Failed to update poll' });
+    }
+  });
+});
+
+// Delete poll
+exports.deletePoll = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.deletePoll(req, res);
+      });
+    } catch (error) {
+      console.error('Error in deletePoll:', error);
+      return res.status(500).json({ error: 'Failed to delete poll' });
+    }
+  });
+});
+
+// Finalize poll
+exports.finalizePoll = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.finalizePoll(req, res);
+      });
+    } catch (error) {
+      console.error('Error in finalizePoll:', error);
+      return res.status(500).json({ error: 'Failed to finalize poll' });
+    }
+  });
+});
+
+// Get poll results
+exports.getPollResults = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.getPollResults(req, res);
+      });
+    } catch (error) {
+      console.error('Error in getPollResults:', error);
+      return res.status(500).json({ error: 'Failed to get poll results' });
+    }
+  });
+});
+
+// Send poll invitations
+exports.sendPollInvitations = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      await validateFirebaseIdToken(req, res, async () => {
+        return pollService.sendPollInvitations(req, res);
+      });
+    } catch (error) {
+      console.error('Error in sendPollInvitations:', error);
+      return res.status(500).json({ error: 'Failed to send poll invitations' });
     }
   });
 });
