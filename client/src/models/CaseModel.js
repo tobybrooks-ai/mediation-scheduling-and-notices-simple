@@ -188,7 +188,42 @@ export const validateCaseData = (caseData) => {
   };
 };
 
-export default {
+// Check if user can edit case
+export const canEditCase = (case_, user) => {
+  if (!case_ || !user) return false;
+  return case_.createdBy === user.uid || user.role === 'admin';
+};
+
+// Check if user can delete case
+export const canDeleteCase = (case_, user) => {
+  if (!case_ || !user) return false;
+  return case_.createdBy === user.uid || user.role === 'admin';
+};
+
+// Get case participant count (alias for getParticipantsCount)
+export const getCaseParticipantCount = (case_) => {
+  return getParticipantsCount(case_);
+};
+
+// Format case date and time
+export const formatCaseDateTime = (timestamp) => {
+  if (!timestamp) return 'Not scheduled';
+  
+  try {
+    const date = new Date(timestamp.seconds * 1000);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    return 'Invalid date';
+  }
+};
+
+const CaseModel = {
   CaseType,
   CaseStatus,
   createCase,
@@ -202,5 +237,11 @@ export default {
   canScheduleCase,
   getParticipantsCount,
   formatCaseDisplayName,
-  validateCaseData
+  validateCaseData,
+  canEditCase,
+  canDeleteCase,
+  getCaseParticipantCount,
+  formatCaseDateTime
 };
+
+export default CaseModel;

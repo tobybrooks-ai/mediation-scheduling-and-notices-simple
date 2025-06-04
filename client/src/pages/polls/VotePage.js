@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import PollVoting from '../../components/polling/PollVoting';
 import { getPollById, submitVote } from '../../services/pollService';
@@ -17,13 +17,7 @@ const VotePage = () => {
   const [error, setError] = useState('');
 
   // Load poll data on component mount
-  useEffect(() => {
-    if (pollId) {
-      loadPollData();
-    }
-  }, [pollId]);
-
-  const loadPollData = async () => {
+  const loadPollData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -57,7 +51,13 @@ const VotePage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pollId, participantEmail]);
+
+  useEffect(() => {
+    if (pollId) {
+      loadPollData();
+    }
+  }, [pollId, loadPollData]);
 
   const handleSubmitVotes = async (voteData) => {
     try {

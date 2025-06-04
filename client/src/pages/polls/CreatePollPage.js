@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import PollForm from '../../components/polling/PollForm';
 import { getCases } from '../../services/caseService';
 import { createPoll } from '../../services/pollService';
 
 const CreatePollPage = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser } = useAuthContext();
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(false);
   const [casesLoading, setCasesLoading] = useState(true);

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import NoticeList from '../../components/notices/NoticeList';
 
 const NoticesPage = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  // const { } = useAuthContext(); // Not currently needed
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

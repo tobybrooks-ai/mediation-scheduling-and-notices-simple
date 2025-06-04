@@ -1,25 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import NoticeDetail from '../../components/notices/NoticeDetail';
 
 const NoticeDetailPage = () => {
   const { noticeId } = useParams();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  // const { } = useAuthContext(); // Not currently needed
   const [notice, setNotice] = useState(null);
   const [emailTracking, setEmailTracking] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Load notice data on component mount
-  useEffect(() => {
-    if (noticeId) {
-      loadNoticeData();
-    }
-  }, [noticeId]);
-
-  const loadNoticeData = async () => {
+  const loadNoticeData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -37,7 +30,14 @@ const NoticeDetailPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [noticeId]);
+
+  // Load notice data on component mount
+  useEffect(() => {
+    if (noticeId) {
+      loadNoticeData();
+    }
+  }, [noticeId, loadNoticeData]);
 
   const handleSendNotice = async () => {
     try {

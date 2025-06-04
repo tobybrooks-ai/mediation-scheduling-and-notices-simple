@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import { signOutUser } from '../../services/authService';
 
 const DashboardLayout = ({ children, title = 'Dashboard' }) => {
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -19,6 +19,7 @@ const DashboardLayout = ({ children, title = 'Dashboard' }) => {
     { name: 'Cases', href: '/cases', icon: '📁' },
     { name: 'Polls', href: '/polls', icon: '📊' },
     { name: 'Notices', href: '/notices', icon: '📄' },
+    { name: 'Activity Timeline', href: '/activity-timeline', icon: '📅' },
     { name: 'Email Tracking', href: '/email-tracking', icon: '📧' }
   ];
 

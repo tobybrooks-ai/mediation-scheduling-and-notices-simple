@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthContext } from '../../hooks/useAuthContext';
 import PollList from '../../components/polling/PollList';
-import { getCases } from '../../services/caseService';
+import { getPolls, deletePoll } from '../../services/pollService';
 
 const PollsPage = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  // const { } = useAuthContext(); // Not currently needed
   const [polls, setPolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -21,9 +21,7 @@ const PollsPage = () => {
       setLoading(true);
       setError('');
       
-      // For now, we'll use a placeholder since we need to implement the getPolls service
-      // TODO: Implement getPolls service function
-      const pollsData = [];
+      const pollsData = await getPolls();
       setPolls(pollsData);
       
     } catch (error) {
@@ -44,8 +42,7 @@ const PollsPage = () => {
     }
 
     try {
-      // TODO: Implement deletePoll service function
-      console.log('Deleting poll:', pollId);
+      await deletePoll(pollId);
       
       // Remove from local state
       setPolls(prev => prev.filter(poll => poll.id !== pollId));
